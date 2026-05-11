@@ -7,7 +7,7 @@ import phase_shifting as ps
 def normalized_phis(k,direction):
     
     # _, imgs = ps.phase_shift_set(direction, k)
-    _, imgs = ps.capture_phase_shift_set(direction, k)
+    _, imgs = ps.phase_shift_set(direction, k)
     # print(  f"{k}_{i}.png")
     height, width, _ = imgs[0].shape
 
