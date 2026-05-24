@@ -63,7 +63,7 @@ camera_matrix = camera_matrix @ Rt_camera
 
 projector_matrix= get_projector_internal_matrix()
 
-Rt_projector = np.hstack((np.eye(3, dtype=np.float32), np.array([[ 120.0,0.0,0.0]], dtype=np.float32).T))
+Rt_projector = np.hstack((np.eye(3, dtype=np.float32), np.array([[ 1200.0,0.0,0]], dtype=np.float32).T))
 
 projector_matrix = projector_matrix  @ Rt_projector
 

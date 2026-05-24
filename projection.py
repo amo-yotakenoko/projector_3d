@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import pos_ditect 
 import phase_shifting as ps
+import open3d as o3d
 
 from cam_param import camera_matrix, projector_matrix
 
@@ -54,51 +55,97 @@ for y in range(merged.shape[0]):
     for x in range(merged.shape[1]):
         v_phase, h_phase, _ = merged[y, x]
         
-        # 位相値が有効な場合のみ計算（例: 0より大きい場合）
+        # 位放値が有効な場合のみ計算（例: 0より大きい場合）
         if v_phase > 0 and h_phase > 0:
             # 1. プロジェクター上の画素座標に変換
-            proj_x = v_phase * ps.width
-            proj_y = h_phase * ps.height
+            # h_phase (横方向の変化) -> X座標
+            # v_phase (縦方向の変化) -> Y座標
+            proj_x = h_phase * ps.width
+            proj_y = v_phase * ps.height
             
             # 2. 三角測量用に座標を整形
-            # points_cam: カメラの (x, y)
-            # points_proj: プロジェクターの (proj_x, proj_y)
+            # points_cam: カメラ (x, y)
+            # points_proj: プロジェクター (proj_x, proj_y)
             pts_cam = np.array([[x, y]], dtype=np.float32).T
             pts_proj = np.array([[proj_x, proj_y]], dtype=np.float32).T
             
-            # 3. 三角測量の実行 (4D同次座標が返る)
+            # 3. 三角測量の実行 (4D同次座標 [X, Y, Z, W] が返る)
             points_4d = cv2.triangulatePoints(camera_matrix, projector_matrix, pts_cam, pts_proj)
-            # print(f"{points_4d=}")
-            # 4. 3D座標に変換 (x, y, z, w) -> (X, Y, Z)
-            points_3d = points_4d[:3, :] / points_4d[3, :]
             
-            # depth_mapに保存 (Z座標が奥行き)
+            # depth_mapに保存 (生の同次座標を保存)
             depth_map[y, x] = points_4d.flatten()
 
 print(f"{depth_map=}")
-    # 1行終わるごとに進捗を表示したい場合はここ
+
 def show_normalized_map(name, data):
-    # 最小値と最大値を取得
-    min_val = np.min(data)
-    max_val = np.max(data)
+    # 0 (背景) 以外の値を取り出す
+    mask = (data != 0)
+    if not np.any(mask):
+        img = np.zeros_like(data, dtype=np.uint8)
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        cv2.imshow(name, img)
+        return img
+
+    valid_data = data[mask]
     
-    # 0除算を防ぎつつ 0.0 ~ 1.0 にスケーリング
+    # 外れ値に強くするため、パーセンタイル（2%〜98%）で最小・最大を決定する
+    min_val = np.percentile(valid_data, 2)
+    max_val = np.percentile(valid_data, 98)
+
+    # スケーリング (0.0 ~ 1.0)
     if max_val - min_val > 0:
-        normalized = (data - min_val) / (max_val - min_val)
+        normalized = np.zeros_like(data)
+        # クリップして範囲外を 0 or 1 に固定
+        clipped = np.clip(data[mask], min_val, max_val)
+        normalized[mask] = (clipped - min_val) / (max_val - min_val)
     else:
         normalized = np.zeros_like(data)
-    
+
     # 255倍して uint8 に変換
-    display_img = (normalized * 255).astype(np.uint8)
-    cv2.imshow(name, display_img)
+    gray_img = (normalized * 255).astype(np.uint8)
+    
+    # カラーマップを適用 (JET: 青 -> 緑 -> 赤)
+    color_img = cv2.applyColorMap(gray_img, cv2.COLORMAP_JET)
+    
+    # マスク外（背景）を黒にする
+    color_img[~mask] = 0
+    
+    cv2.imshow(name, color_img)
+    return color_img
 
 # 各チャンネルを表示
-show_normalized_map("x_map", depth_map[:,:,0])
-show_normalized_map("y_map", depth_map[:,:,1])
-show_normalized_map("z_map", depth_map[:,:,2])
-show_normalized_map("w_map", depth_map[:,:,3])
-# 最終的な奥行き(Z)を取り出す
-z_coords = depth_map[:, :, 2]
-# print(f"中心付近の奥行き: {z_coords[h//2, w//2]} mm")
+
+# 同次座標から 3D 空間座標 (X, Y, Z) への変換 (除算処理)
+W = depth_map[:, :, 3]
+mask = np.abs(W) > 1e-6
+
+X = np.zeros_like(W)
+Y = np.zeros_like(W)
+Z = np.zeros_like(W)
+
+X[mask] = depth_map[mask, 0] / W[mask]
+Y[mask] = depth_map[mask, 1] / W[mask]
+Z[mask] = depth_map[mask, 2] / W[mask]
+
+x_img = show_normalized_map("x_map", X)
+y_img = show_normalized_map("y_map", Y)
+z_img = show_normalized_map("z_map", Z)
+w_img = show_normalized_map("w_map", W)
+
+# 画像として保存
+cv2.imwrite("output_x_map.png", x_img)
+cv2.imwrite("output_y_map.png", y_img)
+cv2.imwrite("output_z_map.png", z_img)
+cv2.imwrite("output_w_map.png", w_img)
+print("画像を保存しました: output_x_map.png, output_y_map.png, output_z_map.png, output_w_map.png")
+
+# Open3D を使った 3D 表示 (いったん無効化)
+# print("Open3D で 3D 表示を開始します...")
+# points = np.stack((X[mask], Y[mask], Z[mask]), axis=-1)
+# pcd = o3d.geometry.PointCloud()
+# pcd.points = o3d.utility.Vector3dVector(points)
+# axes = o3d.geometry.TriangleMesh.create_coordinate_frame(size=100.0, origin=[0, 0, 0])
+# o3d.visualization.draw_geometries([pcd, axes], window_name="3D Point Cloud (Rotatable)")
 
 cv2.waitKey(0)

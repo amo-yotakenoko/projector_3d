@@ -9,9 +9,17 @@ import math
 # 画像サイズ
 width = 800*2
 height = 400*2
+window_name = "sin grayscale"
 
 def phase_shift(freq, shift, direction="v"):
     # 指定サイズ
+
+
+    cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
+
+    # 2. フルスクリーンプロパティを設定する
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
 
     if direction == "v":
@@ -35,13 +43,7 @@ def phase_shift(freq, shift, direction="v"):
         # 2. 「横1行(1, 1600)」を、縦に800個並べる
         return np.tile(gray, (height, 1))
 
-window_name = "sin grayscale"
 
-cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
-
-# 2. フルスクリーンプロパティを設定する
-cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
 
 def capture_phase_shift_set(  direction, k):

@@ -26,12 +26,15 @@ def normalized_phis(k,direction):
 
     result=(phi + np.pi) / (2 * np.pi)
 
-
+    A = np.sqrt(3) * (I1 - I3)
+    B = 2 * I2 - I1 - I3
+    confidence = np.sqrt(A*A + B*B)
+    confidence /= (I1 + I2 + I3 + 1e-6)
 
     
     cv2.imshow(f"phase", result)
-    cv2.waitKey(10)
-    return result
+    cv2.waitKey(1)
+    return result,confidence
 
 
 
@@ -39,33 +42,53 @@ def normalized_phis(k,direction):
 def get_phase_img(direction):
         
 
-    result=normalized_phis(1, direction)
+    result,confidence=normalized_phis(1, direction)
 
     # cv2.imshow(f"step0", normalized_phis[1])
+    confidences = []
 
     for low, high in [(1, 2**(i+1)) for i in range(8-1)]:
+
+    # for low, high in zip(
+    #     [1,2,4,8,16,32,64],
+    #     [2,4,8,16,32,64,128]
+    # ):
+        # result, confidence = normalized_phis(1, direction)
+
+
+        phi, conf = normalized_phis(high, direction)
+
         ratio = high / low
-        print(ratio)
-        # cv2.imshow(f"normalized_phis[{low}]", normalized_phis[low])
-        # cv2.imshow(f"normalized_phis[{high}]", normalized_phis[high])
-        # normalized_phis[high]=cv2.imread(f"{1}_{0}.png")
 
+        k = np.round(result * ratio - phi)
 
-        k = np.round(result * ratio - normalized_phis(high, direction))
-        k /= ratio
-        # cv2.imshow(f"k_{low}_{high}1" ,k)
+        result = (k + phi) / ratio
 
+        confidences.append(conf)
 
         
-        unwrap =  k+normalized_phis(high, direction) / ratio
+        cv2.imshow(f"result", result)
+        
+        # cv2.imshow(f"confidence", confidence)
 
-        cv2.waitKey(10)
+        cv2.waitKey(1)
+        # print(f"low={low}, high={high}, ratio={ratio}, k={k}")
+        
         # cv2.destroyAllWindows()
-        result=unwrap
-        cv2.imshow(f"result", unwrap)
 
-    # cv2.waitKey(0)
+    confidence = np.mean(confidences, axis=0)
+    med = np.median(confidence)
+    confidence = np.where(confidence >= med, 255, 0).astype(np.uint8)
+
+    result = np.where(confidence > 0, result, 0)
+    
+
+    cv2.imshow(f"confidence", confidence)
+    cv2.imshow(f"result", result)
+    cv2.waitKey(1)
     cv2.destroyAllWindows()
+
+
     return result
 
 
