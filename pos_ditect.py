@@ -112,31 +112,4 @@ if __name__ == "__main__":
 
 
 
-def get_virtual_projection_matrices(width=1600, height=800):
-    # --- 1. 内部パラメータ K (Intrinsic) ---
-    # 焦点距離 (f) を適当に1000画素、中心 (cx, cy) を画像中心に設定
-    f = 1000
-    cx, cy = width / 2, height / 2
-    K = np.array([
-        [f, 0, cx],
-        [0, f, cy],
-        [0, 0, 1]
-    ], dtype=np.float32)
-
-    # --- 2. カメラの外部パラメータ (左側の視点) ---
-    # 世界座標の原点に配置 (回転なし、移動なし)
-    R_cam = np.eye(3) # 単位行列
-    t_cam = np.array([[0, 0, 0]], dtype=np.float32).T
-    P_cam = K @ np.hstack((R_cam, t_cam))
-
-    # --- 3. プロジェクターの外部パラメータ (右側の視点) ---
-    # カメラから右に 200mm (0.2m) 離れた場所に配置
-    # (x方向にマイナス移動 = カメラから見て右に物体があるように見える)
-    R_proj = np.eye(3)
-    t_proj = np.array([[-200, 0, 0]], dtype=np.float32).T 
-    P_proj = K @ np.hstack((R_proj, t_proj))
-
-    return P_cam, P_proj
-
-
 
