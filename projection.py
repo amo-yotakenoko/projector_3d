@@ -7,40 +7,14 @@ import open3d as o3d
 from cam_param import camera_matrix, projector_matrix
 
 
-def get_virtual_projection_matrices():
-
-    K_cam = np.array([
-        [800,0,320],
-        [0,800,240],
-        [0,0,1]
-    ], dtype=np.float32)
-
-    K_proj = np.array([
-        [1000,0,800],
-        [0,1000,400],
-        [0,0,1]
-    ], dtype=np.float32)
-
-    P_cam = K_cam @ np.hstack(
-        (np.eye(3), np.zeros((3,1)))
-    )
-
-    P_proj = K_proj @ np.hstack(
-        (
-            np.eye(3),
-            np.array([[-200,0,0]], dtype=np.float32).T
-        )
-    )
-
-    return P_cam, P_proj
 
 
 def normalize_view(img):
     mn = np.min(img)
     mx = np.max(img)
 
-    if mx == mn:
-        return np.zeros_like(img, dtype=np.uint8)
+    # if mx == mn:
+    #     return np.zeros_like(img, dtype=np.uint8)
 
     return ((img - mn) / (mx - mn) * 255).astype(np.uint8)
 
@@ -52,23 +26,28 @@ if __name__ == "__main__":
 
     merged = pos_ditect.get_projection_img()
 
-    print(np.min(merged[:,:,0]), np.max(merged[:,:,0]))
-    print(np.min(merged[:,:,1]), np.max(merged[:,:,1]))
+    print(f"{np.min(merged[:,:,0])=}")
+    print(f"{np.max(merged[:,:,0])=}")
+    print(f"{np.min(merged[:,:,1])=}")
+    print(f"{np.max(merged[:,:,1])=}")
+
+    # print(np.min(merged[:,:,0]), np.max(merged[:,:,0]))
+    # print(np.min(merged[:,:,1]), np.max(merged[:,:,1]))
 
     while True:
         # --- 実行セクション ---
 
         # 仮想カメラ行列の準備
-        P_cam, P_proj = get_virtual_projection_matrices()
+        # P_cam, P_proj = get_virtual_projection_matrices()
         C_cam, C_proj=camera_matrix, projector_matrix 
 
 
 
-        print(f"{camera_matrix=}")
-        print(f"{projector_matrix=}")
+        # print(f"{camera_matrix=}")
+        # print(f"{projector_matrix=}")
 
-        print(f"{P_cam=}")
-        print(f"{P_proj=}")
+        # print(f"{P_cam=}")
+        # print(f"{P_proj=}")
 
         # 画像の取得
 
@@ -82,36 +61,28 @@ if __name__ == "__main__":
                 v_phase, h_phase, _ = merged[y, x]
                 
                 # 位放値が有効な場合のみ計算（例: 0より大きい場合）
-                if v_phase > 0 and h_phase > 0:
                     # 1. プロジェクター上の画素座標に変換
-                    # h_phase (横方向の変化) -> X座標
-                    # v_phase (縦方向の変化) -> Y座標
-                    proj_x = h_phase * ps.width
-                    proj_y = v_phase * ps.height
+                # h_phase (横方向の変化) -> X座標
+                # v_phase (縦方向の変化) -> Y座標
+                proj_x = h_phase * ps.width
+                proj_y = v_phase * ps.height
+                
+                # 2. 三角測量用に座標を整形
+                # points_cam: カメラ (x, y)
+                # points_proj: プロジェクター (proj_x, proj_y)
+                pts_cam = np.array([[x, y]], dtype=np.float32).T
+                pts_proj = np.array([[proj_x, proj_y]], dtype=np.float32).T
+                
+                # 3. 三角測量の実行 (4D同次座標 [X, Y, Z, W] が返る)
+                points_4d = cv2.triangulatePoints( C_cam, C_proj, pts_cam, pts_proj)
+                
+                W = points_4d[3,0]
+                X = (points_4d[0,0]/W+0.5)
+                Y = (points_4d[1,0]/W+0.5)
+                Z = (points_4d[2,0]/W+0.5)
+                depth_map[y, x] = [X, Y, Z, W]
+                    # points_3d = points_4d[:3] / points_4d[3]
                     
-                    # 2. 三角測量用に座標を整形
-                    # points_cam: カメラ (x, y)
-                    # points_proj: プロジェクター (proj_x, proj_y)
-                    pts_cam = np.array([[x, y]], dtype=np.float32).T
-                    pts_proj = np.array([[proj_x, proj_y]], dtype=np.float32).T
-                    
-                    # 3. 三角測量の実行 (4D同次座標 [X, Y, Z, W] が返る)
-                    points_4d = cv2.triangulatePoints(camera_matrix, projector_matrix, pts_cam, pts_proj)
-                    
-                    # print(points_4d)
-                    # depth_mapに保存 (生の同次座標を保存)
-                    depth_map[y, x] = points_4d.flatten()
-                    # print(points_4d[3])
-
-                    points_3d = points_4d[:3] / points_4d[3]
-                    
-
-                    # depth_map[y,x] = [
-                    #     points_3d[0,0],
-                    #     points_3d[1,0],
-                    #     points_3d[2,0],
-                    #     1
-                    # ]
 
 
 
@@ -125,4 +96,4 @@ if __name__ == "__main__":
 
 
 
-        cv2.waitKey(1)
+        cv2.waitKey(0)
