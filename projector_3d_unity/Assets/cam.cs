@@ -51,6 +51,7 @@ public class cam : MonoBehaviour
                Ray ray2,
                out Vector3 point,
                out float error,
+               Color gizmoColor,
                float duration = 0f
            )
         {
@@ -84,13 +85,13 @@ public class cam : MonoBehaviour
             error = Vector3.Distance(p1, p2);
 
             // 誤差部分を赤で表示
-            // Debug.DrawLine(
-            //     p1,
-            //     p2,
-            //     Color.red,
-            //     duration,
-            //     true
-            // );
+            Debug.DrawLine(
+                p1,
+                p2,
+                Color.red,
+                duration,
+                true
+            );
 
             // 推定交点を十字で表示
             float s = 0.02f;
@@ -98,7 +99,7 @@ public class cam : MonoBehaviour
             Debug.DrawLine(
                 point - Vector3.right * s,
                 point + Vector3.right * s,
-                Color.white,
+                gizmoColor,
                 duration,
                 true
             );
@@ -106,7 +107,7 @@ public class cam : MonoBehaviour
             Debug.DrawLine(
                 point - Vector3.up * s,
                 point + Vector3.up * s,
-                Color.white,
+                gizmoColor,
                 duration,
                 true
             );
@@ -114,7 +115,7 @@ public class cam : MonoBehaviour
             Debug.DrawLine(
                 point - Vector3.forward * s,
                 point + Vector3.forward * s,
-                Color.white,
+                gizmoColor,
                 duration,
                 true
             );
@@ -172,7 +173,8 @@ public class cam : MonoBehaviour
                     rayCamera,
                     rayProjector,
                     out _,
-                    out float error))
+                    out float error,
+                    color))
                 {
                     cost += error * error;
                     count++;
@@ -188,6 +190,22 @@ public class cam : MonoBehaviour
     {
         CameraIntrinsics cameraIntrinsics = new CameraIntrinsics(778.979f, 829.372f, texture.width / 2f, texture.height / 2f);
         CameraIntrinsics projectorIntrinsics = new CameraIntrinsics(2488.889f, 2100.000f, 255f / 2, 255f / 2);
+
+        // Add Mesh Generator
+        FrustumMeshGenerator meshGen = gameObject.AddComponent<FrustumMeshGenerator>();
+        // Create a basic white semi-transparent material
+        Material mat = new Material(Shader.Find("Standard"));
+        mat.SetFloat("_Mode", 3); // Transparent
+        mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        mat.SetInt("_ZWrite", 0);
+        mat.DisableKeyword("_ALPHATEST_ON");
+        mat.EnableKeyword("_ALPHABLEND_ON");
+        mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+        mat.renderQueue = 3000;
+        mat.color = new Color(1, 1, 1, 0.2f);
+        meshGen.meshMaterial = mat;
+        meshGen.Setup(cameraIntrinsics, projectorIntrinsics, texture.width, texture.height, projector);
 
 
         while (true)
@@ -207,7 +225,7 @@ public class cam : MonoBehaviour
                     //     $"R={color.r:F3}, " +
                     //     $"G={color.g:F3}, " +
                     //     $"B={color.b:F3}, " +
-                    //     $"A={color.a:F3}"
+                    //     $"A={color.a:F3}" +
                     // );
 
                     if (color.r <= 0 && color.g <= 0 && color.b <= 0) continue;
@@ -234,14 +252,8 @@ public class cam : MonoBehaviour
                         direction = dirWorldProjector
                     };
 
-                    if (x == 0 || x + 5 >= texture.width || y == 0 || y + 5 >= texture.height)
-                        rayCamera.DebugDraw(color);
 
-                    if (px <= 1.0f || px >= 254.0f || py <= 1.0f || py >= 254.0f)
-                        rayProjector.DebugDraw(color);
-
-
-                    if (Ray.ClosestIntersection(rayCamera, rayProjector, out Vector3 point, out float error))
+                    if (Ray.ClosestIntersection(rayCamera, rayProjector, out Vector3 point, out float error, color))
                     {
                         // Debug.Log($"Intersection Point: {point}, Error: {error}");
                     }
