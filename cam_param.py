@@ -48,25 +48,29 @@ def load_and_print_npz(file_path='cam.npz'):
     except Exception as e:
         print(f"Error: {e}")
 
-# 実行
-camera_matrix,_ = load_and_print_npz()
-camera_matrix
-print(camera_matrix)
+def get_projection_matrices(projector_t=[5.0, 0.0, 0.0], projector_r=[0.0, 0.0, 0.0]):
+    # カメラ内部行列のロード
+    camera_matrix_internal, _ = load_and_print_npz()
+    
+    # カメラのRt (基準なので単位行列)
+    Rt_camera = np.hstack((np.eye(3, dtype=np.float32), np.zeros((3, 1), dtype=np.float32)))
+    camera_matrix = camera_matrix_internal @ Rt_camera
 
+    # プロジェクター内部行列の取得
+    projector_matrix_internal = get_projector_internal_matrix()
 
+    # プロジェクターの回転行列 (Euler角から変換 - 簡易版)
+    rx, ry, rz = projector_r
+    Rx = np.array([[1, 0, 0], [0, np.cos(rx), -np.sin(rx)], [0, np.sin(rx), np.cos(rx)]])
+    Ry = np.array([[np.cos(ry), 0, np.sin(ry)], [0, 1, 0], [-np.sin(ry), 0, np.cos(ry)]])
+    Rz = np.array([[np.cos(rz), -np.sin(rz), 0], [np.sin(rz), np.cos(rz), 0], [0, 0, 1]])
+    R = Rz @ Ry @ Rx
 
-Rt_camera = np.hstack((np.eye(3, dtype=np.float32), np.zeros((3, 1), dtype=np.float32)))
+    # プロジェクターのRt
+    Rt_projector = np.hstack((R.astype(np.float32), np.array([projector_t], dtype=np.float32).T))
+    projector_matrix = projector_matrix_internal @ Rt_projector
 
-# 4. 内部行列 K と掛けて投影行列 P を作成
-camera_matrix = camera_matrix @ Rt_camera
+    return camera_matrix, projector_matrix
 
-
-projector_matrix= get_projector_internal_matrix()
-
-Rt_projector = np.hstack((np.eye(3, dtype=np.float32), np.array([[ 5,0,0]], dtype=np.float32).T))
-
-projector_matrix = projector_matrix  @ Rt_projector
-
-
-print("Projector Internal Matrix:")
-print(projector_matrix)
+# 初期値での互換性維持
+camera_matrix, projector_matrix = get_projection_matrices()
