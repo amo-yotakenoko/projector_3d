@@ -4,10 +4,10 @@ import math
 import phase_shifting as ps
 
 
-def normalized_phis(k,direction):
+def normalized_phis(imgs):
     
     # _, imgs = ps.phase_shift_set(direction, k)
-    _, imgs = ps.phase_shift_set(direction, k)
+    # _, imgs = ps.phase_shift_set(direction, k)
     # print(  f"{k}_{i}.png")
     height, width, _ = imgs[0].shape
 
@@ -39,10 +39,10 @@ def normalized_phis(k,direction):
 
 
 
-def get_phase_img(direction):
+def get_phase_img(direction, phase_frames):
         
 
-    result,confidence=normalized_phis(1, direction)
+    result,confidence=normalized_phis(phase_frames[1])
 
     # cv2.imshow(f"step0", normalized_phis[1])
     confidences = []
@@ -54,9 +54,11 @@ def get_phase_img(direction):
     #     [2,4,8,16,32,64,128]
     # ):
         # result, confidence = normalized_phis(1, direction)
+        if not high in phase_frames:
+            break
 
 
-        phi, conf = normalized_phis(high, direction)
+        phi, conf = normalized_phis(phase_frames[high])
 
         ratio = high / low
 
@@ -92,9 +94,9 @@ def get_phase_img(direction):
     return result
 
 
-def get_projection_img():
-    v_img=get_phase_img("v")
-    h_img=get_phase_img("h")
+def get_projection_img(phase_frames):
+    v_img=get_phase_img("v",phase_frames["v"])
+    h_img=get_phase_img("h",phase_frames["h"])
     merged_img = cv2.merge([v_img, h_img,np.full_like(v_img, 0)])
     return merged_img
 

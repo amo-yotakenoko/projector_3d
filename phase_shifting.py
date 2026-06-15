@@ -9,17 +9,17 @@ import math
 # 画像サイズ
 width = 800*2
 height = 400*2
-window_name = "sin grayscale"
+
+
+
+
+window_name = "Fullscreen_Window"
 
 def phase_shift(freq, shift, direction="v"):
     # 指定サイズ
 
 
-    cv2.namedWindow(window_name, cv2.WND_PROP_FULLSCREEN)
 
-    # 2. フルスクリーンプロパティを設定する
-    cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 
 
     if direction == "v":
@@ -46,7 +46,25 @@ def phase_shift(freq, shift, direction="v"):
 
 
 
-def capture_phase_shift_set(  direction, k):
+def capture_phase_shift_set(cap,  direction, k):
+
+
+
+    # 1. 普通のウィンドウとして作成する（ここがポイント）
+    # ※最初からフルスクリーンで開くと moveWindow が効かないことがあります
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+
+    # 2. 表示したいディスプレイの「左上端の座標」を指定して移動させる
+    # 例：メイン画面の右側に「1920x1080」のサブ画面があり、そこに表示したい場合
+    display_x = 1920  # サブ画面の開始X座標
+    display_y = 0     # サブ画面の開始Y座標
+    cv2.moveWindow(window_name, display_x, display_y)
+
+    # 3. 移動した後にフルスクリーン化する
+    cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+
+
+    
     imgs=[]
     cams=[]
     for i,shita in enumerate( [0,1/3,2/3]):
