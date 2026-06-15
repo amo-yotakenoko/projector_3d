@@ -79,13 +79,22 @@ def get_phase_img(direction, phase_frames):
         # cv2.destroyAllWindows()
 
     confidence = np.mean(confidences, axis=0)
-    med = np.median(confidence)
-    confidence = np.where(confidence >= med, 255, 0).astype(np.uint8)
-
-    result = np.where(confidence > 0, result, 0)
     
+    # Improved thresholding: use a combination of absolute and relative thresholds
+    avg_conf = np.mean(confidence)
+    std_conf = np.std(confidence)
+    
+    # Thresholding logic: pixels with confidence significantly lower than average are noise
+    thresh = max(0.01, avg_conf - 0.5 * std_conf)
+    mask = np.where(confidence > thresh, 255, 0).astype(np.uint8)
 
-    cv2.imshow(f"confidence", confidence)
+    # Apply morphological cleaning to remove small noise dots
+    kernel = np.ones((3,3), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+    result = np.where(mask > 0, result, 0)
+    
+    cv2.imshow(f"confidence_mask", mask)
     cv2.imshow(f"result", result)
     cv2.waitKey(1)
     cv2.destroyAllWindows()
