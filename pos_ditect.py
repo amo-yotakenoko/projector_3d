@@ -90,7 +90,7 @@ def get_phase_img(direction, phase_frames):
 
     # Apply morphological cleaning to remove small noise dots
     kernel = np.ones((3,3), np.uint8)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    # mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
     result = np.where(mask > 0, result, 0)
     

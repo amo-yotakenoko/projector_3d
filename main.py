@@ -2,6 +2,7 @@ import phase_shifting
 import cv2
 import pos_ditect
 import numpy as np
+import os
 
 
 PHASE_DETAIL=2
@@ -29,7 +30,7 @@ if ENABLE_CAMERA:
 else:
     for direction in ["v","h"]:
         for k in [2**i for i in range(PHASE_DETAIL)]:
-            phase_frames[direction][k]=[cv2.imread(f"phase_frames_2/{direction}_{k}_{i}.png") for i in range(3)]
+            phase_frames[direction][k]=[cv2.imread(f"phase_frames_none/{direction}_{k}_{i}.png") for i in range(3)]
 
 
 # uv座標を取得
@@ -48,12 +49,15 @@ if np.any(valid_mask):
             uv_img[:, :, i] = np.where(valid_mask, (channel - c_min) / (c_max - c_min), 0)
 
 # Interactive warping
-points = np.array([
-    [100, 100],
-    [uv_img.shape[1] - 100, 100],
-    [uv_img.shape[1] - 100, uv_img.shape[0] - 100],
-    [100, uv_img.shape[0] - 100]
-], dtype=np.float32)
+if os.path.exists("points.npy"):
+    points = np.load("points.npy")
+else:
+    points = np.array([
+        [100, 100],
+        [uv_img.shape[1] - 100, 100],
+        [uv_img.shape[1] - 100, uv_img.shape[0] - 100],
+        [100, uv_img.shape[0] - 100]
+    ], dtype=np.float32)
 
 dragging_idx = -1
 
@@ -108,18 +112,25 @@ while True:
     
     cv2.imshow("gradient", gradient_img)
 
-    # Calculate error (distance and angle)
-    warped_float = warped.astype(np.float32) * 255.0
-    ideal_float = gradient_img.astype(np.float32)
-
-    dx = warped_float[:, :, 1] - ideal_float[:, :, 1]
-    dy = warped_float[:, :, 0] - ideal_float[:, :, 0]
-
-    error_dist = np.sqrt(dx**2 + dy**2)
-    
     # Mask for valid pixels in the warped image
     valid_warped_mask = np.any(warped > 0, axis=2)
 
+    # Remove small noise from mask using morphological opening
+    kernel = np.ones((3, 3), np.uint8)
+    valid_warped_mask = cv2.morphologyEx(valid_warped_mask.astype(np.uint8), cv2.MORPH_OPEN, kernel).astype(bool)
+
+    # Calculate error (distance and angle) only for valid pixels
+    warped_float = warped.astype(np.float32) * 255.0
+    ideal_float = gradient_img.astype(np.float32)
+
+    dx = np.zeros((dst_h, dst_w), dtype=np.float32)
+    dy = np.zeros((dst_h, dst_w), dtype=np.float32)
+    dx[valid_warped_mask] = warped_float[valid_warped_mask, 1] - ideal_float[valid_warped_mask, 1]
+    dy[valid_warped_mask] = warped_float[valid_warped_mask, 0] - ideal_float[valid_warped_mask, 0]
+
+    error_dist = np.zeros((dst_h, dst_w), dtype=np.float32)
+    error_dist[valid_warped_mask] = np.sqrt(dx[valid_warped_mask]**2 + dy[valid_warped_mask]**2)
+    
     # Robust dynamic normalization: Use a percentile (e.g., 98th) to avoid being skewed by outliers
     if np.any(valid_warped_mask):
         max_val = np.percentile(error_dist[valid_warped_mask], 80)
@@ -137,14 +148,34 @@ while True:
         dist_display = np.zeros((dst_h, dst_w, 3), dtype=np.uint8)
     cv2.imshow("error_distance", dist_display)
 
-    error_angle = np.arctan2(dy, dx)
+    error_angle = np.zeros((dst_h, dst_w), dtype=np.float32)
+    error_angle[valid_warped_mask] = np.arctan2(dy[valid_warped_mask], dx[valid_warped_mask])
+    
     hsv_error = np.zeros((dst_h, dst_w, 3), dtype=np.uint8)
-    hsv_error[:, :, 0] = ((error_angle + np.pi) / (2 * np.pi) * 179).astype(np.uint8)
-    hsv_error[:, :, 1] = 255
-    hsv_error[:, :, 2] = error_intensity # Brightness depends on error magnitude (grayscale intensity)
+    hsv_error[valid_warped_mask, 0] = ((error_angle[valid_warped_mask] + np.pi) / (2 * np.pi) * 179).astype(np.uint8)
+    hsv_error[valid_warped_mask, 1] = 255
+    hsv_error[valid_warped_mask, 2] = error_intensity[valid_warped_mask] # Brightness depends on error magnitude (grayscale intensity)
     
     angle_display = cv2.cvtColor(hsv_error, cv2.COLOR_HSV2BGR)
     cv2.imshow("error_angle", angle_display)
+    
+    # Draw error vectors as arrows
+    vector_display = (uv_img * 255).astype(np.uint8) # Or use a blank image, but warped size matches dst_w, dst_h
+    vector_display = cv2.cvtColor(cv2.warpPerspective(display_img, M, (dst_w, dst_h)), cv2.COLOR_BGR2GRAY)
+    vector_display = cv2.cvtColor(vector_display, cv2.COLOR_GRAY2BGR)
+    
+    step = 20
+    for y in range(0, dst_h, step):
+        for x in range(0, dst_w, step):
+            if valid_warped_mask[y, x]:
+                vx = int(dx[y, x])
+                vy = int(dy[y, x])
+                if np.sqrt(vx**2 + vy**2) > 0.5: # Only draw if there is a noticeable error
+                    start_point = (x, y)
+                    end_point = (x + vx, y + vy)
+                    cv2.arrowedLine(vector_display, start_point, end_point, (0, 255, 255), 1, tipLength=0.3)
+    
+    cv2.imshow("error_vectors", vector_display)
     
     key = cv2.waitKey(1) & 0xFF
     
@@ -206,6 +237,10 @@ while True:
             points[:, 0] = np.clip(points[:, 0], 0, uv_img.shape[1] - 1)
             points[:, 1] = np.clip(points[:, 1], 0, uv_img.shape[0] - 1)
             # print(f"Loss: {current_loss:.4f}")
+
+    if key == ord('s'):
+        np.save("points.npy", points)
+        print("Points saved to points.npy")
 
     if key == 27 or key == ord('q'):
         break
