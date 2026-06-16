@@ -30,13 +30,22 @@ if ENABLE_CAMERA:
 else:
     for direction in ["v","h"]:
         for k in [2**i for i in range(PHASE_DETAIL)]:
-            phase_frames[direction][k]=[cv2.imread(f"phase_frames_none/{direction}_{k}_{i}.png") for i in range(3)]
+            phase_frames[direction][k]=[cv2.imread(f"phase_frames_2/{direction}_{k}_{i}.png") for i in range(3)]
 
 
 # uv座標を取得
 
 
 uv_img=pos_ditect.get_projection_img(phase_frames)
+
+# Apply median filter to reduce noise and fill small gaps in the UV map
+# Note: Converting to uint8 for compatibility with some OpenCV builds
+uv_img_uint8 = (uv_img * 255).astype(np.uint8)
+ksize = 1 # Adjust this (3, 5, 7, 9...) to change blur strength
+for i in range(3):
+    uv_img_uint8[:, :, i] = cv2.medianBlur(uv_img_uint8[:, :, i], ksize)
+uv_img = uv_img_uint8.astype(np.float32) / 255.0
+
 
 # Normalize uv_img for better visualization (prevent overexposure)
 valid_mask = np.any(uv_img > 0, axis=2)
@@ -165,16 +174,27 @@ while True:
     vector_display = cv2.cvtColor(vector_display, cv2.COLOR_GRAY2BGR)
     
     step = 20
+    count_under_10 = 0
+    total_valid = np.sum(valid_warped_mask)
+    
     for y in range(0, dst_h, step):
         for x in range(0, dst_w, step):
             if valid_warped_mask[y, x]:
                 vx = int(dx[y, x])
                 vy = int(dy[y, x])
-                if np.sqrt(vx**2 + vy**2) > 0.5: # Only draw if there is a noticeable error
+                err = np.sqrt(vx**2 + vy**2)
+                if err > 0.5: # Only draw if there is a noticeable error
                     start_point = (x, y)
                     end_point = (x + vx, y + vy)
-                    cv2.arrowedLine(vector_display, start_point, end_point, (0, 255, 255), 1, tipLength=0.3)
+                    # Color based on error threshold
+                    color = (0, 255, 0) if err < 10 else (0, 255, 255) # Green if < 10, else Yellow
+                    cv2.arrowedLine(vector_display, start_point, end_point, color, 1, tipLength=0.3)
     
+    # Calculate and display stats
+    if total_valid > 0:
+        prec_under_10 = np.sum(error_dist[valid_warped_mask] < 10) / total_valid * 100
+        cv2.putText(vector_display, f"Under 10px: {prec_under_10:.1f}%", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
     cv2.imshow("error_vectors", vector_display)
     
     key = cv2.waitKey(1) & 0xFF
@@ -194,6 +214,10 @@ while True:
             # Mask valid pixels (where any channel is non-zero)
             valid_warped_mask = np.any(W > 0, axis=2)
             
+            # Remove small noise from mask for loss calculation consistency
+            kernel_l = np.ones((3, 3), np.uint8)
+            valid_warped_mask = cv2.morphologyEx(valid_warped_mask.astype(np.uint8), cv2.MORPH_OPEN, kernel_l).astype(bool)
+
             if not np.any(valid_warped_mask):
                 return 1e10 # Return large loss if no valid pixels in frame
 
@@ -203,11 +227,29 @@ while True:
             DX = W_f[:, :, 1] - grad_f[:, :, 1]
             DY = W_f[:, :, 0] - grad_f[:, :, 0]
             
-            # Calculate mean squared error only for valid pixels
-            mse = np.mean((DX[valid_warped_mask]**2 + DY[valid_warped_mask]**2))
+            dist_sq = DX[valid_warped_mask]**2 + DY[valid_warped_mask]**2
+            dist = np.sqrt(dist_sq)
+
+            # Prioritize increasing the count of pixels with error < 10px
+            # Use a loss that is flat for large errors but steep for small ones to encourage precision
+            # Or a modified Charbonnier/Huber loss that favors small residuals
+            
+            # High precision reward: pixels under 10px get a "steep" gradient to improve further
+            # Pixels far away are still pulled in, but we prioritize the "near-perfect" ones
+            threshold = 10.0
+            
+            # Custom loss: 
+            # - For dist < threshold, use MSE to drive them to 0
+            # - For dist >= threshold, use linear loss to reduce outlier influence 
+            #   AND add a penalty for being above the threshold
+            loss_precision = np.where(dist < threshold, 
+                                     dist_sq, 
+                                     threshold * 2 * dist - threshold**2 + 500.0)
+            
+            mse = np.mean(loss_precision)
             
             # Add a penalty for missing coverage to encourage larger valid area
-            coverage_penalty = np.mean(~valid_warped_mask) * 1000.0
+            coverage_penalty = np.mean(~valid_warped_mask) * 5000.0
             
             return mse + coverage_penalty
 
