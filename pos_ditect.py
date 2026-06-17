@@ -32,8 +32,8 @@ def normalized_phis(imgs):
     confidence /= (I1 + I2 + I3 + 1e-6)
 
     
-    cv2.imshow(f"phase", result)
-    cv2.waitKey(1)
+    # cv2.imshow(f"phase_debug", result)
+    # cv2.waitKey(1)
     return result,confidence
 
 
@@ -69,7 +69,7 @@ def get_phase_img(direction, phase_frames):
         confidences.append(conf)
 
         
-        cv2.imshow(f"result", result)
+        # cv2.imshow(f"result_{direction}", result)
         
         # cv2.imshow(f"confidence", confidence)
 
@@ -95,10 +95,10 @@ def get_phase_img(direction, phase_frames):
 
     result = np.where(mask > 0, result, 0)
     
-    cv2.imshow(f"confidence_mask", mask)
-    cv2.imshow(f"result", result)
-    cv2.waitKey(1)
-    cv2.destroyAllWindows()
+    # cv2.imshow(f"confidence_mask_{direction}", mask)
+    # cv2.imshow(f"result_{direction}", result)
+    # cv2.waitKey(1)
+    # cv2.destroyAllWindows() # DANGEROUS: affects all threads
 
 
     return result
@@ -116,8 +116,8 @@ if __name__ == "__main__":
     h_img=get_phase_img("h")
     merged_img = cv2.merge([v_img, h_img,np.full_like(v_img, 0)])
 
-    cv2.imshow("v_img", v_img)
-    cv2.imshow("h_img", h_img)
+    # cv2.imshow("v_img", v_img)
+    # cv2.imshow("h_img", h_img)
     cv2.imshow("merged_img", merged_img)
     cv2.waitKey(0)
 
