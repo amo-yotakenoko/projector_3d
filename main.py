@@ -3,9 +3,11 @@ import cv2
 import pos_ditect
 import numpy as np
 import os
+import threading
+import queue
 
 
-PHASE_DETAIL=2
+PHASE_DETAIL=1
 
 ENABLE_CAMERA=False
 
@@ -18,19 +20,19 @@ phase_frames={"v":{},"h":{}}
 
 if ENABLE_CAMERA:
 
-    cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
-    for direction in ["v","h"]:
-        for k in [2**i for i in range(PHASE_DETAIL)]:
-            imgs, cams = phase_shifting.capture_phase_shift_set(cap,direction, k)
-            phase_frames[direction][k]=cams
+    # cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+    # for direction in ["v","h"]:
+    #     for k in [2**i for i in range(PHASE_DETAIL)]:
+    #         imgs, cams = phase_shifting.capture_phase_shift_set(cap,direction, k)
+    #         phase_frames[direction][k]=cams
 
-            for i, frame in enumerate(cams):
-                cv2.imwrite(f"phase_frames/{direction}_{k}_{i}.png", frame)
+    #         for i, frame in enumerate(cams):
+    #             cv2.imwrite(f"phase_frames/{direction}_{k}_{i}.png", frame)
 
 else:
     for direction in ["v","h"]:
         for k in [2**i for i in range(PHASE_DETAIL)]:
-            phase_frames[direction][k]=[cv2.imread(f"phase_frames_4/{direction}_{k}_{i}.png") for i in range(3)]
+            phase_frames[direction][k]=[cv2.imread(f"phase_frames_4_none/{direction}_{k}_{i}.png") for i in range(3)]
 
 
 # uv座標を取得
