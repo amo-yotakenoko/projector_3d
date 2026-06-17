@@ -3,6 +3,7 @@ import numpy as np
 import math
 from pathlib import Path
 import shutil, os
+import queue
 
 # フォルダごと削除して、すぐ空のフォルダを作り直す（1行ずつ）
 
@@ -10,7 +11,7 @@ import shutil, os
 
 PHASE_DETAIL=1
 
-def phase_shifting_capture_loop(loop_max=-1):
+def phase_shifting_capture_loop(cap_frame_queue, loop_max=-1):
 
     # 1. 普通のウィンドウとして作成する（ここがポイント）
     # ※最初からフルスクリーンで開くと moveWindow が効かないことがあります
@@ -61,23 +62,29 @@ def phase_shifting_capture_loop(loop_max=-1):
         name = list(phase_frames.keys())[(frame_count+offset) % len(phase_frames)]
 
 
-        # x番目の値を取得する場合
         phase_frame = list(phase_frames.values())[frame_count % len(phase_frames)]
 
         cv2.imshow("phase", phase_frame)
-        cv2.waitKey(1)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
         for _ in range(1):
             ret, cap_frame = cap.read()
             cap_frames[name] = cap_frame
+
 
         
 
 
         frame_count += 1
 
-    for name, cap_frame in cap_frames.items():
-        cv2.imwrite(f"phase_frames/{name}.png", cap_frame)
+        if frame_count % len(phase_frames)==0:
+            cap_frame_queue.put(cap_frames.copy())
+            exit()
+    # for name, cap_frame in cap_frames.items():
+    #     cv2.imwrite(f"phase_frames/{name}.png", cap_frame)
+
+        
 
 
 

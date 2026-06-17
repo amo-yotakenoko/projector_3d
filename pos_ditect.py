@@ -78,7 +78,8 @@ def get_phase_img(direction, phase_frames):
         
         # cv2.destroyAllWindows()
 
-    confidence = np.mean(confidences, axis=0)
+    if confidences:
+        confidence = np.mean(confidences, axis=0)
     
     # Improved thresholding: use a combination of absolute and relative thresholds
     avg_conf = np.mean(confidence)

@@ -5,20 +5,27 @@ import numpy as np
 import os
 import threading
 import queue
+import phase_shifting_capture_loop 
 
 
 PHASE_DETAIL=1
 
-ENABLE_CAMERA=False
+ENABLE_CAMERA=True
 
 
 phase_frames={"v":{},"h":{}}
 
 
 
+cap_frame_queue = queue.Queue(maxsize=1)
+
 # カメラらの取得
 
 if ENABLE_CAMERA:
+
+    th = threading.Thread(target=phase_shifting_capture_loop.phase_shifting_capture_loop, args=(cap_frame_queue,))
+    th.daemon = True  
+    th.start()
 
     # cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     # for direction in ["v","h"]:
@@ -29,6 +36,21 @@ if ENABLE_CAMERA:
     #         for i, frame in enumerate(cams):
     #             cv2.imwrite(f"phase_frames/{direction}_{k}_{i}.png", frame)
 
+    cap_frames=cap_frame_queue.get()
+    phase_frames={}
+    for name, frame in sorted(cap_frames.items()):
+        print(name)
+        direction,k,i=name.split('_')
+
+        phase_frames.setdefault(direction, {}).setdefault(int(k), [])
+        phase_frames[direction][int(k)].append(frame)
+        cv2.imshow(f"frame{name}", frame)
+        print(f"{frame=}")
+        if cv2.waitKey(100) & 0xFF == ord('q'):
+            break
+    cv2.waitKey(3000)
+
+
 else:
     for direction in ["v","h"]:
         for k in [2**i for i in range(PHASE_DETAIL)]:
@@ -37,6 +59,10 @@ else:
 
 # uv座標を取得
 
+# print(phase_frames)
+
+# print(phase_frames.keys())
+# exit()
 
 uv_img=pos_ditect.get_projection_img(phase_frames)
 
