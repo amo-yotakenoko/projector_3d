@@ -30,7 +30,7 @@ if ENABLE_CAMERA:
 else:
     for direction in ["v","h"]:
         for k in [2**i for i in range(PHASE_DETAIL)]:
-            phase_frames[direction][k]=[cv2.imread(f"phase_frames_2/{direction}_{k}_{i}.png") for i in range(3)]
+            phase_frames[direction][k]=[cv2.imread(f"phase_frames_4/{direction}_{k}_{i}.png") for i in range(3)]
 
 
 # uv座標を取得
