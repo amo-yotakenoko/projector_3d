@@ -5,8 +5,9 @@ from pathlib import Path
 import shutil, os
 import queue
 import time
+from  settings import *
 
-PHASE_DETAIL=1
+
 
 def phase_shifting_capture_loop(cap_frame_queue,  loop_max=-1):
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
@@ -44,15 +45,18 @@ def phase_shifting_capture_loop(cap_frame_queue,  loop_max=-1):
             break
 
         # 前のロジックを復元: offsetでカメラとモニタの遅延を吸収
-        name = keys[(frame_count + offset) % len(keys)]
-        phase_frame = values[frame_count % len(values)]
+        name = keys[(frame_count ) % len(keys)]
+        phase_frame = values[(frame_count+ offset) % len(values)]
 
         # メインスレッドに投影指示
         # project_queue.put(phase_frame)
+        if not IS_PROJECTOR:
+            # print("宿所")
+            phase_frame=cv2.resize(phase_frame,None ,fx=0.5, fy=0.5)
         cv2.imshow("phase", phase_frame)
 
 
-        for _ in range(100):
+        for _ in range(20):
             key =cv2.waitKey(1) & 0xFF
             if key== ord("q"):
                 return
@@ -71,13 +75,16 @@ def phase_shifting_capture_loop(cap_frame_queue,  loop_max=-1):
         # 高速にキャプチャ
         ret, cap_frame = cap.read()
         cap_frames[name] = cap_frame
-
-        cv2.imshow("cap", cap_frames[name])
+        # print( [f for f in  cap_frames.keys() if f is not None])
+        stack_cap=np.vstack( [f for f in  cap_frames.values() if f is not None])
+        stack_cap= cv2.resize(stack_cap, None, fx=0.3, fy=0.3) 
+        cv2.imshow("cap",stack_cap)
 
         
 
         if frame_count % len(keys) == 0:
             cap_frame_queue.put(cap_frames.copy())
+            # cap_frames={}
 
 
         frame_count += 1
