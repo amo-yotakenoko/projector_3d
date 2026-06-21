@@ -8,8 +8,12 @@ import time
 
 PHASE_DETAIL=1
 
-def phase_shifting_capture_loop(cap_frame_queue, project_queue, loop_max=-1):
+def phase_shifting_capture_loop(cap_frame_queue,  loop_max=-1):
     cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+
+        
+
     
     # Wait for camera to stabilize
     for _ in range(5):
@@ -27,33 +31,56 @@ def phase_shifting_capture_loop(cap_frame_queue, project_queue, loop_max=-1):
 
     keys = list(phase_frames_dict.keys())
     values = list(phase_frames_dict.values())
+
+    view_frames=[None]*6
+
     
     cap_frames={}
     frame_count=0
+    offset = 1
     
     while True:
         if loop_max==frame_count:
             break
 
         # 前のロジックを復元: offsetでカメラとモニタの遅延を吸収
-        offset = 2
         name = keys[(frame_count + offset) % len(keys)]
         phase_frame = values[frame_count % len(values)]
 
         # メインスレッドに投影指示
-        project_queue.put(phase_frame)
+        # project_queue.put(phase_frame)
+        cv2.imshow("phase", phase_frame)
+
+
+        for _ in range(100):
+            key =cv2.waitKey(1) & 0xFF
+            if key== ord("q"):
+                return
+            if key==ord("w"):
+                offset-=1
+                print(f"offset:{offset}")
+            if key==ord("e"):
+                offset+=1
+                print(f"offset:{offset}")
+
+        
         
         # わずかな待ち（以前のwaitKey(1)相当）
-        time.sleep(0.2)
+        # time.sleep(0.5)
 
         # 高速にキャプチャ
         ret, cap_frame = cap.read()
         cap_frames[name] = cap_frame
+
+        cv2.imshow("cap", cap_frames[name])
+
         
-        frame_count += 1
 
         if frame_count % len(keys) == 0:
             cap_frame_queue.put(cap_frames.copy())
+
+
+        frame_count += 1
 
 # 画像サイズ
 width = 800*2

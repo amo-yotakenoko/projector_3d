@@ -16,15 +16,24 @@ ENABLE_CAMERA=True
 
 phase_frames={"v":{},"h":{}}
 
+window_name ="phase"
+
+# 2. 表示したいディスプレイの「左上端の座標」を指定して移動させる
+    # 例：メイン画面の右側に「1920x1080」のサブ画面があり、そこに表示したい場合
+display_x = 1920  # サブ画面の開始X座標
+display_y = 0     # サブ画面の開始Y座標
+# cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+# cv2.moveWindow(window_name, display_x, display_y)
+# cv2.setWindowProperty(window_name, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
 
 
 cap_frame_queue = queue.Queue(maxsize=1)
-project_queue = queue.Queue(maxsize=1)
+
 
 # カメラらの取得
 
 if ENABLE_CAMERA:
-    th = threading.Thread(target=phase_shifting_capture_loop.phase_shifting_capture_loop, args=(cap_frame_queue, project_queue))
+    th = threading.Thread(target=phase_shifting_capture_loop.phase_shifting_capture_loop, args=(cap_frame_queue,))
     th.daemon = True  
     th.start()
     
@@ -32,11 +41,7 @@ if ENABLE_CAMERA:
     print("Waiting for initial capture...")
     # 初回はプロジェクタの表示を回しながら待つ
     while True:
-        try:
-            p_frame = project_queue.get_nowait()
-            cv2.imshow("phase", p_frame)
-        except queue.Empty:
-            pass
+      
         
         try:
             cap_frames = cap_frame_queue.get_nowait()
@@ -62,11 +67,7 @@ while True:
     
     if ENABLE_CAMERA:
         # プロジェクタの表示更新
-        try:
-            p_frame = project_queue.get_nowait()
-            cv2.imshow("phase", p_frame)
-        except queue.Empty:
-            pass
+   
 
         # 新しいキャプチャセットの取得
         try:
