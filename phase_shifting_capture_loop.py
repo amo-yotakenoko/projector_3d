@@ -76,7 +76,8 @@ def phase_shifting_capture_loop(cap_frame_queue,  loop_max=-1):
         ret, cap_frame = cap.read()
         cap_frames[name] = cap_frame
         # print( [f for f in  cap_frames.keys() if f is not None])
-        stack_cap=np.vstack( [f for f in  cap_frames.values() if f is not None])
+        import util
+        stack_cap=util.safe_vstack( [f for f in  cap_frames.values() if f is not None])
         stack_cap= cv2.resize(stack_cap, None, fx=0.3, fy=0.3) 
         cv2.imshow("cap",stack_cap)
 

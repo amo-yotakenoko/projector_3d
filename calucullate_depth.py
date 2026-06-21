@@ -36,6 +36,9 @@ class DepthAnalyzer:
             self.dragging_idx = -1
 
     def update(self, phase_frames, key):
+
+
+        debug_preview_stack={}
         # phase_framesが変わった場合（新しいキャプチャ）、UV画像を再計算
         # 簡易的なIDチェックとして、辞書の長さや適当なハッシュを使いたいが、
         # ここでは単純に別オブジェクトなら更新とする
@@ -92,8 +95,11 @@ class DepthAnalyzer:
 
         M = cv2.getPerspectiveTransform(self.points, self.dst_pts)
         warped = cv2.warpPerspective(self.uv_img, M, (self.dst_w, self.dst_h))
-        cv2.imshow("warped", warped)
-        cv2.imshow("gradient", self.gradient_img)
+        debug_preview_stack["warped"]=warped
+        debug_preview_stack["gradient"]=self.gradient_img
+
+        # cv2.imshow("warped", warped)
+        # cv2.imshow("gradient", self.gradient_img)
 
         valid_warped_mask = np.any(warped > 0, axis=2)
         kernel = np.ones((3, 3), np.uint8)
@@ -122,7 +128,8 @@ class DepthAnalyzer:
         else:
             error_intensity = np.zeros((self.dst_h, self.dst_w), dtype=np.uint8)
             dist_display = np.zeros((self.dst_h, self.dst_w, 3), dtype=np.uint8)
-        cv2.imshow("error_distance", dist_display)
+        # cv2.imshow("error_distance", dist_display)
+        debug_preview_stack["error_distance"]=dist_display
 
         error_angle = np.zeros((self.dst_h, self.dst_w), dtype=np.float32)
         error_angle[valid_warped_mask] = np.arctan2(dy[valid_warped_mask], dx[valid_warped_mask])
@@ -133,7 +140,8 @@ class DepthAnalyzer:
         hsv_error[valid_warped_mask, 2] = error_intensity[valid_warped_mask]
         
         angle_display = cv2.cvtColor(hsv_error, cv2.COLOR_HSV2BGR)
-        cv2.imshow("error_angle", angle_display)
+        # cv2.imshow("error_angle", angle_display)
+        debug_preview_stack["error_angle"]= angle_display
         
         vector_display = cv2.cvtColor(cv2.warpPerspective(display_img, M, (self.dst_w, self.dst_h)), cv2.COLOR_BGR2GRAY)
         vector_display = cv2.cvtColor(vector_display, cv2.COLOR_GRAY2BGR)
@@ -152,7 +160,8 @@ class DepthAnalyzer:
         if total_valid > 0:
             prec_under_10 = np.sum(error_dist[valid_warped_mask] < 10) / total_valid * 100
             cv2.putText(vector_display, f"Under 10px: {prec_under_10:.1f}%", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-        cv2.imshow("error_vectors", vector_display)
+        # cv2.imshow("error_vectors", vector_display)
+        debug_preview_stack["error_vectors"]=  vector_display
 
         # 最適化 ('o'キー)
         if key == ord('o'):
@@ -189,6 +198,21 @@ class DepthAnalyzer:
                 self.points -= step_v
                 self.points[:, 0] = np.clip(self.points[:, 0], 0, self.uv_img.shape[1] - 1)
                 self.points[:, 1] = np.clip(self.points[:, 1], 0, self.uv_img.shape[0] - 1)
+
+
+        # 各ウインドウを別で表示(未使用なので消さない)
+        # for key,value in  debug_preview_stack.items():
+        #     cv2.imshow(key,value)
+
+        # 各ウインドウをまとめて表示(未使用なので消さない)
+        import util
+        debug_preview_stack=util.safe_vstack( [f for f in debug_preview_stack.values() if f is not None])
+        print(f"{debug_preview_stack=}")
+        debug_preview_stack= cv2.resize(debug_preview_stack, None, fx=0.5, fy=0.5) 
+
+        cv2.imshow("debug_preview_stack",debug_preview_stack)
+
+
 
         if key == ord('s'):
             np.save("points.npy", self.points)
